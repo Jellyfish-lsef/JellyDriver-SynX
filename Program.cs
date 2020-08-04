@@ -20,9 +20,9 @@ namespace JellyDriver_SynapseX
             SLib = SxLib.InitializeOffscreen(dir);
             SLib.LoadEvent += (Ev, Param) =>
             {
+                Console.WriteLine("l|" + Ev);
                 if (Ev == SxLibBase.SynLoadEvents.READY)
                 {
-                    Console.WriteLine("Loading complete! Now getting the script hub.");
 
                     //Register a handler for AttachEvent.
                     SLib.ScriptHubEvent += SLibOnScriptHubEvent;
@@ -30,9 +30,8 @@ namespace JellyDriver_SynapseX
                     //Attach Synapse X.
                     SLib.ScriptHub();
 
-                    return;
                 }
-                Console.WriteLine("l|" + Ev);
+                
             };
             SLib.AttachEvent += (Ev, Param) =>
             {
@@ -47,15 +46,20 @@ namespace JellyDriver_SynapseX
             }
             catch (Exception e)
             {
-                Console.WriteLine("e|" + e.Message);
+                if (!e.Message.StartsWith("Could not find")) { 
+                    Console.WriteLine("e|" + e.Message);
+                }
                 FolderBrowserDialog fbd = new FolderBrowserDialog();
-                fbd.Description = e.Message;
+                fbd.Description = "Select the directory where Synapse X is installed";
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
                     createSLib(fbd.SelectedPath);
                     load();
                     File.WriteAllText("config.jdx", fbd.SelectedPath);
 
+                } else
+                {
+                    Application.Exit();
                 }
             }
         }
@@ -72,35 +76,48 @@ namespace JellyDriver_SynapseX
             createSLib(loc);
             load();
 
+            string s = "";
             while (true)
             {
                 try
                 {
-                    var k = Console.ReadLine();
-                    if (k.StartsWith("i|"))
+                    int ke = Console.Read();
+                    if (ke == 13) { continue; }
+                    if (ke == 10)
                     {
-                        SLib.Attach();
-                    }
-                    if (k.StartsWith("s|"))
-                    {
-                        var txt = File.ReadAllText(k.Replace("s|", ""));
-                        var s = txt.Split('|');
-                        if (txt.StartsWith("SYNX_SHUB|"))
+                        string k = "";
+                        k = s;
+                        s = "";
+                        if (k.StartsWith("i|"))
                         {
-                            foreach (var Entry in sh)
+                            SLib.Attach();
+                        }
+                        if (k.StartsWith("s|"))
+                        {
+                            var txt = File.ReadAllText(k.Replace("s|", ""));
+                            var sp = txt.Split('|');
+                            if (txt.StartsWith("SYNX_SHUB|"))
                             {
-                                if (Entry.Name.Replace("|","l") == s[1])
+                                foreach (var Entry in sh)
                                 {
-                                    Console.WriteLine($"esh|{Entry.Name.Replace("|", "l")}");
-                                    Entry.Execute();
+                                    if (Entry.Name.Replace("|", "l") == sp[1])
+                                    {
+                                        Console.WriteLine($"esh|{Entry.Name.Replace("|", "l")}");
+                                        Entry.Execute();
+                                    }
                                 }
                             }
-                        } else
-                        {
-                            Console.WriteLine($"e{k}");
-                            SLib.Execute(txt);
+                            else
+                            {
+                                Console.WriteLine($"e{k}");
+                                SLib.Execute(txt);
+                            }
+                            
                         }
-                        
+                    }
+                    else
+                    {
+                        s += (char)ke;
                     }
                 } catch(Exception e)
                 {
