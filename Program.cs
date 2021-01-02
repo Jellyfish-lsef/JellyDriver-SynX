@@ -5,23 +5,23 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
-using sxlib;
-using sxlib.Specialized;
+
 using Microsoft.Win32;
 using System.Windows.Forms;
+using System.Reflection;
 
 namespace JellyDriver_SynapseX
 {
-    class Program
+    class Prog
     {
-        private static SxLibOffscreen SLib;
+        private static sxlib.Specialized.SxLibOffscreen SLib;
         public static void createSLib(string dir)
         {
-            SLib = SxLib.InitializeOffscreen(dir);
+            SLib = sxlib.SxLib.InitializeOffscreen(dir);
             SLib.LoadEvent += (Ev, Param) =>
             {
                 Console.WriteLine("l|" + Ev);
-                if (Ev == SxLibBase.SynLoadEvents.READY)
+                if (Ev == sxlib.Specialized.SxLibBase.SynLoadEvents.READY)
                 {
 
                     //Register a handler for AttachEvent.
@@ -38,43 +38,20 @@ namespace JellyDriver_SynapseX
                 Console.WriteLine("a|" + Ev);
             };
         }
-        public static void load()
-        {
-            try
-            {
-                SLib.Load();
-            }
-            catch (Exception e)
-            {
-                if (!e.Message.StartsWith("Could not find")) { 
-                    Console.WriteLine("e|" + e.Message);
-                }
-                FolderBrowserDialog fbd = new FolderBrowserDialog();
-                fbd.Description = "Select the directory where Synapse X is installed";
-                if (fbd.ShowDialog() == DialogResult.OK)
-                {
-                    createSLib(fbd.SelectedPath);
-                    load();
-                    File.WriteAllText("config.jdx", fbd.SelectedPath);
-
-                } else
-                {
-                    Application.Exit();
-                }
-            }
-        }
+        
 
         [STAThread]
-        public static void Main(string[] args)
+        public void Man(string[] args)
         {
-            string loc = "";
-            if (File.Exists("config.jdx"))
+            
+            if (!File.Exists(Application.StartupPath + @"\auth\options.bin"))
             {
-                loc = File.ReadAllText("config.jdx");
+                MessageBox.Show("I am not in the Synapse folder. Oh no.");
+                Application.Exit();
+                return;
             }
-
-            createSLib(loc);
-            load();
+            createSLib(Application.StartupPath);
+            SLib.Load();
 
             string s = "";
             while (true)
@@ -125,13 +102,70 @@ namespace JellyDriver_SynapseX
                 }
             }
         }
-        private static List<SxLibBase.SynHubEntry> sh;
-        private static void SLibOnScriptHubEvent(List<SxLibBase.SynHubEntry> Entries)
+
+
+        private static List<sxlib.Specialized.SxLibBase.SynHubEntry> sh;
+        private static void SLibOnScriptHubEvent(List<sxlib.Specialized.SxLibBase.SynHubEntry> Entries)
         {
             sh = Entries;
             foreach (var Entry in Entries)
             {
                 Console.WriteLine($"sh|{Entry.Name.Replace("|","l")}|{Entry.Description.Replace("|", "l")}|{Entry.Picture.Replace("|", "l")}");
+            }
+        }
+    }
+    class Program
+    {
+        public static void Main(string[] args)
+        {
+            AppDomain currentDomain = AppDomain.CurrentDomain;
+            currentDomain.AssemblyResolve += new ResolveEventHandler(LoadFromSameFolder);
+            Prog poggers = new Prog();
+            poggers.Man(args);
+        }
+        static Assembly LoadFromSameFolder(object sender, ResolveEventArgs args)
+        {
+            //This handler is called only when the common language runtime tries to bind to the assembly and fails.
+
+            Assembly executingAssembly = Assembly.GetExecutingAssembly();
+
+            string applicationDirectory = Path.GetDirectoryName(executingAssembly.Location);
+
+            string[] fields = args.Name.Split(',');
+            string assemblyName = fields[0];
+            string assemblyCulture;
+            if (fields.Length < 2)
+                assemblyCulture = null;
+            else
+                assemblyCulture = fields[2].Substring(fields[2].IndexOf('=') + 1);
+
+
+            string assemblyFileName = assemblyName + ".dll";
+            string assemblyPath;
+
+            if (assemblyName.EndsWith(".resources"))
+            {
+                // Specific resources are located in app subdirectories
+                string resourceDirectory = Path.Combine(applicationDirectory, assemblyCulture);
+
+                assemblyPath = Path.Combine(resourceDirectory, assemblyFileName);
+            } else
+            {
+                assemblyPath = Path.Combine(applicationDirectory, "bin","sxlib", assemblyFileName);
+            }
+
+
+
+            if (File.Exists(assemblyPath))
+            {
+                //Load the assembly from the specified path.                    
+                Assembly loadingAssembly = Assembly.LoadFrom(assemblyPath);
+
+                //Return the loaded assembly.
+                return loadingAssembly;
+            } else
+            {
+                return null;
             }
         }
     }
